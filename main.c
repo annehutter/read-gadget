@@ -27,7 +27,6 @@ int main(int argc, char **argv)
 	particles = initParticles();
 
 	int snapshot_format;
-	float boxsize;
 
 #ifdef __MPI
 	MPI_Init(&argc,&argv);
@@ -37,9 +36,7 @@ int main(int argc, char **argv)
 
 	domain_t *domain;
 	domain = initDomain(myRank, size);
-	
-	MPI_Barrier(MPI_COMM_WORLD);
-	
+		
 	/* get snapshotfilenames */
 	if(argc!=7 && myRank==0){
 		printf("usage: ./read_snapshot_parallel <path of snapshot> <basename of snapshot> <snapshot number> <number of files per snapshot> <size in MB of chunks>\n");

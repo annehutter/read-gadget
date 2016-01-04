@@ -50,7 +50,9 @@ void read_gadget_file(domain_t *thisDomain, header_t *thisHeader, input_t *thisI
 			fprintf(stderr,"Given snapshot format not supported.\n");
 		}
 
+#ifdef __MPI
 		MPI_Barrier(MPI_COMM_WORLD);
+#endif
 
 /*-----------------------------------------------------------------------------------------*/
 /* reading positions of particles (in data chunks)                                         */
@@ -68,8 +70,8 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 	unsigned int buf_Npos;
 	float *buf_pos;
 	char buf_char[4];
-	int Npart_chunk;
-	int Nchunks=0, maxNchunks=0;
+	unsigned int Npart_chunk;
+	unsigned int Nchunks=0, maxNchunks=0;
 	int allParticleRead = 0;
 	
 	FILE *fd;
@@ -120,15 +122,19 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 	fseek(fd, file_offset, SEEK_CUR);
 	
 	Npart_chunk = thisInput->size_in_MB*1024*1024/12;
-	printf("Npart_chunk = %d corrsponds to %d bytes\n", Npart_chunk, Npart_chunk*3*sizeof(float));
+	printf("Npart_chunk = %d corrsponds to %ld bytes\n", Npart_chunk, Npart_chunk*3*sizeof(float));
 	buf_pos = malloc(Npart_chunk*3*sizeof(float));
 	
 	Nchunks = thisHeader->npart[particle_type]/Npart_chunk;
+#ifdef __MPI
 	MPI_Allreduce(&Nchunks, &maxNchunks, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+#else
+	maxNchunks = Nchunks;
+#endif
 	printf("rank %d: Nchunks = %d \tmaxNchunks = %d\n", thisDomain->originRank, Nchunks, maxNchunks);
 	allParticleRead = 0;
 
-	for(int i=0; i<maxNchunks; i++)
+	for(unsigned int i=0; i<maxNchunks; i++)
 	{
 		if((i+1)*Npart_chunk >= thisHeader->npart[particle_type])
 		{
@@ -141,20 +147,27 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 		/* read data in chunks */
 		printf("reading %d. chunk ... < %d \n", i*Npart_chunk, thisHeader->npart[particle_type]);
 		fread(buf_pos, sizeof(float), Npart_chunk*3, fd);
-		
+
+#ifdef __MPI
 		/* sort particles to processors */
 		printf("sorting particles to processores ...\n");
 		sort_particles_to_processors(thisDomain, thisHeader, thisInput, theseParticles, buf_pos, Npart_chunk, "POS ");
+#else
+		allocateParticles_pos(theseParticles, Npart_chunk, buf_pos);
+#endif
 	}
 	free(buf_pos);
 	buf_pos = NULL;
+
 	fclose(fd);
 	printf("closed file\n");
 }
 
+
 /* routine to sort read particle position data to processors depending on their position */
 void sort_particles_to_processors(domain_t *thisDomain, header_t *thisHeader, input_t *thisInput, part_t *theseParticles, float *buf, int Npart_chunk, char description[])
 {
+#ifdef __MPI
 	int *dims = thisDomain->dims;
 	float boxsize = thisHeader->BoxSize;
 	float inv_boxsize = 1.f/boxsize;
@@ -248,4 +261,5 @@ void sort_particles_to_processors(domain_t *thisDomain, header_t *thisHeader, in
 	free(NpartDomain);
 	free(recNpartDomain);
 	free(buf_proc);
+#endif
 }

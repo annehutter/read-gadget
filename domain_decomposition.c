@@ -15,15 +15,18 @@ domain_t *initDomain(int thisRank, int size)
 	int *n;
 	float tmpDim;
 	
+#ifdef __MPI
 // 	MPI_Status status;
 // 	MPI_Request request[2];
 	MPI_Comm comm_cart;
 	int mpiStat;
+
 	
 	int neighbourRank;
 	int neighbourCoords[3];
 	int exist = 0;
 	int counter;
+#endif
 	
 	int ndims = 3;
   
@@ -70,6 +73,7 @@ domain_t *initDomain(int thisRank, int size)
 	
 	if(size > 1)
 	{
+#ifdef __MPI
 		mpiStat = MPI_Cart_create(MPI_COMM_WORLD, ndims, newDomain->dims, newDomain->periods, 1, &comm_cart);
 		assert(mpiStat == MPI_SUCCESS);
 		mpiStat = MPI_Cart_coords(comm_cart, thisRank, ndims, newDomain->coords);
@@ -113,6 +117,7 @@ domain_t *initDomain(int thisRank, int size)
 				newDomain->lowlimit[j] = (newDomain->neighbourCoords[ndims*i+j]+1)*tmpDim;
 			}
 		}
+#endif
 	}else{
 	  	for(int j=0; j<ndims; j++)
 		{
