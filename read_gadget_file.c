@@ -118,7 +118,7 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 	
 	/* seek position of particle type in file */
 	file_offset = 0;
-	for(int i=0; i<particle_type; i++) file_offset += thisHeader->npart[i]*3*sizeof(float);
+	for(int i=0; i<particle_type; i++) file_offset += thisHeader->npart[i]*sizeof(float);
 	fseek(fd, file_offset, SEEK_CUR);
 	
 	Npart_chunk = thisInput->size_in_MB*1024*1024/12;
@@ -185,8 +185,25 @@ void sort_particles_to_processors(domain_t *thisDomain, header_t *thisHeader, in
 	MPI_Status status;
 	
 	NpartDomain = malloc(thisDomain->size*sizeof(int));
+	if(NpartDomain == NULL)
+	{
+		fprintf(stderr, "ERROR: allocating NpartDomain: Not enough memory to allocate array.\n");
+		exit(EXIT_FAILURE);
+	}
+	
 	recNpartDomain = malloc(thisDomain->size*sizeof(int));
+	if(recNpartDomain == NULL)
+	{
+		fprintf(stderr, "ERROR: allocating recNpartDomain: Not enough memory to allocate array.\n");
+		exit(EXIT_FAILURE);
+	}
+	
 	buf_proc = malloc(Npart_chunk*sizeof(float));
+	if(buf_proc == NULL)
+	{
+		fprintf(stderr, "ERROR: allocating buf_proc: Not enough memory to allocate array.\n");
+		exit(EXIT_FAILURE);
+	}
 	
 	
 	for(int i=0; i<thisDomain->size; i++)
@@ -200,13 +217,17 @@ void sort_particles_to_processors(domain_t *thisDomain, header_t *thisHeader, in
 		ypos = buf[p*3+1];
 		zpos = buf[p*3+2];
 
-		x = xpos*inv_boxsize*dims[0];
-		y = ypos*inv_boxsize*dims[1];
-		z = zpos*inv_boxsize*dims[2];
+		x = floor(xpos*inv_boxsize*dims[0]);
+		y = floor(ypos*inv_boxsize*dims[1]);
+		z = floor(zpos*inv_boxsize*dims[2]);
 		
 		if(x>=thisDomain->size || y>=thisDomain->size || z>=thisDomain->size) printf("P %d: x=%d\t y=%d\t z=%d\t %f %f %f\n",p,x,y,z,xpos,ypos,zpos);
 		buf_proc[p] = x*dims[1]*dims[2]+y*dims[2]+z;
+		assert(buf_proc[p] == x*dims[1]*dims[2]+y*dims[2]+z);
+// 		if(buf_proc[p] == 0) printf("P %d: %e %e %e\t x=%d\t y=%d\t z=%d\t %d\n",p,xpos, ypos, zpos,x,y,z,thisDomain->originRank);
 		assert(buf_proc[p]<thisDomain->size);
+// 		if(buf_proc[p]==2) printf("P %d: %e %e %e\t x=%d\t y=%d\t z=%d\t %d\t %d %d %d\t %d\t%d\n",p,xpos, ypos, zpos,x,y,z,thisDomain->originRank, dims[0], dims[1], dims[2], x*dims[1]*dims[2]+y*dims[2]+z, buf_proc[p]);
+
 		NpartDomain[buf_proc[p]]++;
 	}
 	

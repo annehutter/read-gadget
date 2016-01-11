@@ -35,15 +35,17 @@ part_t *initParticles()
 void allocateParticles_pos(part_t *theseParticles, int numPart, float *buf)
 {
 	unsigned int numOld = theseParticles->num;
+	theseParticles->num = numOld + numPart;
 	
 	if(theseParticles->pos == NULL)
 	{
 		theseParticles->pos = malloc(sizeof(float)*numPart*3);
 	}else{
-		theseParticles->pos = realloc(theseParticles->pos, sizeof(float)*(numPart+numOld)*3);
+		theseParticles->pos = realloc(theseParticles->pos, sizeof(float)*(theseParticles->num)*3);
 	}
 	
-	memcpy(&theseParticles->pos[numOld], buf, sizeof(float)*numPart*3);
+	memcpy(&theseParticles->pos[3*numOld], buf, sizeof(float)*numPart*3);
+// 	for(int p=0; p<3*numPart, p++) theseParticles->pos[3*numOld+p] = buf[p];
 }
 
 void deallocateParticles(part_t *theseParticles)

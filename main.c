@@ -11,7 +11,11 @@
 #include "header.h"
 #include "domain_decomposition.h"
 #include "part.h"
+#include "grid.h"
+
 #include "read_gadget_file.h"
+#include "sph_density.h"
+#include "particles_to_grid.h"
 
 int main(int argc, char **argv)
 {
@@ -38,12 +42,13 @@ int main(int argc, char **argv)
 	domain = initDomain(myRank, size);
 		
 	/* get snapshotfilenames */
-	if(argc!=7 && myRank==0){
-		printf("usage: ./read_snapshot_parallel <path of snapshot> <basename of snapshot> <snapshot number> <number of files per snapshot> <size in MB of chunks>\n");
+	if(argc!=8 && myRank==0){
+		printf("usage: ./read_snapshot_parallel <path of snapshot> <basename of snapshot> <snapshot number> <number of files per snapshot> <size in MB of chunks> <gridsize of clump array>\n");
 		exit(0);
 	}
 	char path[200], input_fname[200], basename[200];
 	int snapshot_number, files, size_in_MB;
+	int gridsize;
 
 	sprintf(path, argv[1]);
 	sprintf(basename, argv[2]);
@@ -51,17 +56,21 @@ int main(int argc, char **argv)
 	files = atoi(argv[4]);
 	snapshot_format = atoi(argv[5]);
 	size_in_MB = atoi(argv[6]);
+	gridsize = atoi(argv[7]);
 
 	sprintf(input_fname, "%s/%s_%03d", path, basename, snapshot_number);
 	
 	input = initInput(files, input_fname, snapshot_format, 1, size_in_MB);
 	
-	/* read header */
+	/* read particles */
 	
 	read_gadget_file(domain, header, input, particles);
 	
-	/* read particles to each processor */
+	/* compute SPH density for each particle */
+	compute_SPH_density(domain, header, particles);
 	
+	produce_clumping_factor_fields(domain, header, input, particles, gridsize);
+
 	printf("deallocating ...\n");
 	deallocateDomain(domain);
 	printf("- domain\n");
@@ -71,7 +80,10 @@ int main(int argc, char **argv)
 	printf("- particles\n");
 	deallocateInput(input);
 	printf("- input\n");
-	
+
+#ifdef __MPI
+	MPI_Barrier(MPI_COMM_WORLD);
+#endif
 	
 	return 0;
 }

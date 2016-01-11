@@ -56,15 +56,14 @@ domain_t *initDomain(int thisRank, int size)
 	newDomain->size = size;
 	
 	newDomain->numNeighbours = getNumNeighbours(size, ndims, n);
-
-	for(int i=0; i<ndims; i++)
-	{
-		printf("%d: %d\n", i, newDomain->dims[i]);
-	}
 	
 	if(newDomain->numNeighbours>0)
 	{
 		newDomain->listNeighbourRanks = malloc(newDomain->numNeighbours*sizeof(int));
+		for(int i=0; i<newDomain->numNeighbours; i++)
+		{
+			newDomain->listNeighbourRanks[i] = -99;	//set to value, so rank 0 is not excluded later from being a neighbour
+		}
 		newDomain->neighbourCoords = malloc(newDomain->numNeighbours*sizeof(int)*3);
 	}else{
 		newDomain->listNeighbourRanks = NULL;
@@ -98,25 +97,22 @@ domain_t *initDomain(int thisRank, int size)
 						}
 						if(exist != 1){
 							newDomain->listNeighbourRanks[counter] = neighbourRank;
-							for(int j=0; j<3; j++) newDomain->neighbourCoords[ndims*counter+j] = neighbourCoords[j];
-							
-						//printf("rank %d: x=%d y=%d z=%d neighborRank = %d\n",thisRank,x,y,z,neighborRank);
+							for(int j=0; j<3; j++) newDomain->neighbourCoords[ndims*counter+j] = (neighbourCoords[j]+newDomain->dims[j])%newDomain->dims[j];
 							counter++;
 						}
 					}
 				}
 			}
 		}
-	
-		for(int i=0; i<newDomain->numNeighbours; i++)
+		MPI_Barrier(MPI_COMM_WORLD);
+		
+		for(int j=0; j<ndims; j++)
 		{
-			for(int j=0; j<ndims; j++)
-			{
-				tmpDim = 1.f/((float)newDomain->dims[j]);
-				newDomain->uplimit[j] = newDomain->neighbourCoords[ndims*i+j]*tmpDim;
-				newDomain->lowlimit[j] = (newDomain->neighbourCoords[ndims*i+j]+1)*tmpDim;
-			}
+			tmpDim = 1.f/((float)newDomain->dims[j]);
+			newDomain->lowlimit[j] = newDomain->coords[j]*tmpDim;
+			newDomain->uplimit[j] = (newDomain->coords[j]+1)*tmpDim;
 		}
+		printf("rank %d: %e %e %e\t %e %e %e\n", newDomain->originRank, newDomain->lowlimit[0], newDomain->lowlimit[1], newDomain->lowlimit[2], newDomain->uplimit[0], newDomain->uplimit[1], newDomain->uplimit[2]);
 #endif
 	}else{
 	  	for(int j=0; j<ndims; j++)
@@ -148,8 +144,12 @@ int getNumNeighbours(int size, int ndims, int *n)
 		numNeighbours = 0;
 	}else if(size<27)
 	{
-		if(n2+n3<3) numNeighbours = pow(2,n2)+pow(3,n3)-1;
-		else numNeighbours = 17;
+		if(size<=12)
+		{
+			numNeighbours = size-1;//pow(2,n2)+pow(3,n3)-1;
+		}else if(size<18){
+			size = 11;
+		}else numNeighbours = 17;
 	}else{
 		numNeighbours = pow(3,ndims)-1;
 	}
