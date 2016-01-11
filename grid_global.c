@@ -16,7 +16,7 @@
 #include "grid_global.h"
 
 
-grid_t *initGrid_withDomain(domain_t *thisDomain, header_t *thisHeader, int gridsize)
+grid_t *initGrid_withDomain(domain_t *thisDomain, float boxsize, int gridsize)
 {
 	grid_t *newGrid;
 	newGrid = initGrid();
@@ -25,8 +25,8 @@ grid_t *initGrid_withDomain(domain_t *thisDomain, header_t *thisHeader, int grid
 	
 	for(int i=0; i<3; i++)
 	{
-		newGrid->upLimit[i] = thisDomain->uplimit[i]*thisHeader->BoxSize;
-		newGrid->lowLimit[i] = thisDomain->lowlimit[i]*thisHeader->BoxSize;
+		newGrid->upLimit[i] = thisDomain->uplimit[i]*boxsize;
+		newGrid->lowLimit[i] = thisDomain->lowlimit[i]*boxsize;
 		newGrid->upLimit_int[i] = thisDomain->uplimit[i]*gridsize;
 		newGrid->lowLimit_int[i] = thisDomain->lowlimit[i]*gridsize;
 		newGrid->dim[i] = (int)roundf(gridsize/thisDomain->dims[i]);

@@ -3,7 +3,7 @@
 #endif
 
 
-grid_t *initGrid_withDomain(domain_t *thisDomain, header_t *thisHeader, int gridsize);
+grid_t *initGrid_withDomain(domain_t *thisDomain, float boxsize, int gridsize);
 float *allocateGrid_withDomain_float(domain_t *thisDomain, int gridsize);
 int *allocateGrid_withDomain_int(domain_t *thisDomain, int gridsize);
 

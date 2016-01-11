@@ -44,11 +44,11 @@ double meanRho_part_global(part_t *theseParticles)
 	return meanRho_part_global;
 }
 
-void comp_arrays_for_clump(domain_t *thisDomain, header_t *thisHeader, part_t *theseParticles, grid_t *thisGrid)
+void comp_arrays_for_clump(domain_t *thisDomain, part_t *theseParticles, grid_t *thisGrid, float boxsize)
 {
 	float upLimit = 100.;
   
-	float inv_BoxSize = 1.f/thisHeader->BoxSize;
+	float inv_BoxSize = 1.f/boxsize;
 	int gridsize = thisGrid->gridsize;
 	float factor = inv_BoxSize*gridsize;
 	int totNcells;
@@ -70,6 +70,7 @@ void comp_arrays_for_clump(domain_t *thisDomain, header_t *thisHeader, part_t *t
 	
 	/* go through particles in each domain and compute values */
 	printf("rank %d: factor = %e\n", thisDomain->originRank, factor);
+	printf("rank %d: low_limit = %d %d %d\n", thisDomain->originRank, thisGrid->lowLimit_int[0], thisGrid->lowLimit_int[1], thisGrid->lowLimit_int[2]);
 	for(int p = 0; p<theseParticles->num; p++)
 	{
 		x_int = theseParticles->pos[3*p]*factor-thisGrid->lowLimit_int[0];
@@ -97,11 +98,19 @@ void comp_arrays_for_clump(domain_t *thisDomain, header_t *thisHeader, part_t *t
 
 void produce_clumping_factor_fields(domain_t *thisDomain, header_t *thisHeader, input_t *thisInput, part_t *theseParticles, int gridsize)
 {
-	grid_t *thisGrid;
-	thisGrid = initGrid_withDomain(thisDomain, thisHeader, gridsize);
+	float boxsize;
+	if(thisDomain->originRank == 0)
+	{
+		boxsize = thisHeader->BoxSize;
+	}
+	MPI_Bcast(&boxsize, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
+	printf("rank %d: boxsize = %e\t %e\n",thisDomain->originRank, boxsize, thisHeader->BoxSize);
 	
+	grid_t *thisGrid;
+	thisGrid = initGrid_withDomain(thisDomain, boxsize, gridsize);
+
 	printf("rank %d: initialized grid\n", thisDomain->originRank);
-	comp_arrays_for_clump(thisDomain, thisHeader, theseParticles, thisGrid);
+	comp_arrays_for_clump(thisDomain, theseParticles, thisGrid, boxsize);
 	
 	save_rho_to_file(thisDomain, thisGrid, thisInput);
 // 	save_rho_to_file(thisGrid, thisInput);

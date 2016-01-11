@@ -59,7 +59,7 @@ void read_header_gadget1(header_t *thisHeader, char *fname, int myRank)
 			exit(0);
 		}
 
-	printf("reading `%s' ...\n", buf);
+	printf("header: reading `%s' ...\n", buf);
 	fflush(stdout);
 	
 	fread(&dummy, sizeof(dummy), 1, fd);

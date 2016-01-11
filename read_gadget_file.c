@@ -26,28 +26,40 @@ void read_gadget_file(domain_t *thisDomain, header_t *thisHeader, input_t *thisI
 	int snapshot_format = thisInput->snapshot_format;
 	int particle_type = thisInput->particle_type;
 	
-	for(int i=myRank%size; i<files; i=i+size)
+	int max;
+	
+	if(size<files)
 	{
-		if(files > 1)
+		if(files%size == 0) max = files;
+		else max = files + (size - files%size);
+	}
+	else max = size;
+	
+	for(int i=myRank%size; i<max; i=i+size)
+	{
+		if(i < files)
 		{
-			sprintf(buf, "%s.%d", fname, i);
-		}else{
-			sprintf(buf, "%s", fname);
-		}
+			if(files > 1)
+			{
+				sprintf(buf, "%s.%d", fname, i);
+			}else{
+				sprintf(buf, "%s", fname);
+			}
 
-		
-/*-----------------------------------------------------------------------------------------*/
-/* reading header of file                                                                  */
-/*-----------------------------------------------------------------------------------------*/
+			
+	/*-----------------------------------------------------------------------------------------*/
+	/* reading header of file                                                                  */
+	/*-----------------------------------------------------------------------------------------*/
 
-		if(snapshot_format == 1)
-		{
-			read_header_gadget1(thisHeader, buf, myRank);
-		}else if(snapshot_format == 2)
-		{
-			read_header_gadget2(thisHeader, buf, myRank);
-		}else{
-			fprintf(stderr,"Given snapshot format not supported.\n");
+			if(snapshot_format == 1)
+			{
+				read_header_gadget1(thisHeader, buf, myRank);
+			}else if(snapshot_format == 2)
+			{
+				read_header_gadget2(thisHeader, buf, myRank);
+			}else{
+				fprintf(stderr,"Given snapshot format not supported.\n");
+			}
 		}
 
 #ifdef __MPI
@@ -57,8 +69,12 @@ void read_gadget_file(domain_t *thisDomain, header_t *thisHeader, input_t *thisI
 /*-----------------------------------------------------------------------------------------*/
 /* reading positions of particles (in data chunks)                                         */
 /*-----------------------------------------------------------------------------------------*/
-
-		read_particle_pos(thisDomain, thisHeader, thisInput, theseParticles, particle_type, buf);
+		if(i<files)
+		{
+			read_particle_pos(thisDomain, thisHeader, thisInput, theseParticles, particle_type, buf);
+		}else{
+			recv_particle_pos(thisDomain, thisHeader, thisInput, theseParticles, particle_type);
+		}
 	}
 }
 
@@ -163,6 +179,38 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 	printf("closed file\n");
 }
 
+void recv_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thisInput, part_t *theseParticles, int particle_type)
+{
+	float *buf_pos;
+	unsigned int Npart_chunk;
+	unsigned int Nchunks=0, maxNchunks=0;
+	int allParticleRead = 0;
+	
+	Npart_chunk = 0;
+	buf_pos = malloc(Npart_chunk*3*sizeof(float));
+	
+	Nchunks = 0;
+#ifdef __MPI
+	MPI_Allreduce(&Nchunks, &maxNchunks, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+#else
+	maxNchunks = Nchunks;
+#endif
+	printf("rank %d: Nchunks = %d \tmaxNchunks = %d\n", thisDomain->originRank, Nchunks, maxNchunks);
+	allParticleRead = 0;
+
+	for(unsigned int i=0; i<maxNchunks; i++)
+	{
+#ifdef __MPI
+		/* sort particles to processors */
+		printf("sorting particles to processores ...\n");
+		sort_particles_to_processors(thisDomain, thisHeader, thisInput, theseParticles, buf_pos, Npart_chunk, "POS ");
+#else
+		allocateParticles_pos(theseParticles, Npart_chunk, buf_pos);
+#endif
+	}
+	free(buf_pos);
+	buf_pos = NULL;
+}
 
 /* routine to sort read particle position data to processors depending on their position */
 void sort_particles_to_processors(domain_t *thisDomain, header_t *thisHeader, input_t *thisInput, part_t *theseParticles, float *buf, int Npart_chunk, char description[])
