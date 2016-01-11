@@ -57,6 +57,12 @@ int main(int argc, char **argv)
 	snapshot_format = atoi(argv[5]);
 	size_in_MB = atoi(argv[6]);
 	gridsize = atoi(argv[7]);
+	
+	if(gridsize%size != 0)
+	{
+		if(myRank == 0) printf("number of processors needs to be a multiple of gridsize (i.e. 2 and 3) are allowed. Please adjust your number of processors or gridsize!\n");
+		exit(0);
+	}
 
 	sprintf(input_fname, "%s/%s_%03d", path, basename, snapshot_number);
 	

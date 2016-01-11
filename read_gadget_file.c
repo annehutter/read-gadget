@@ -89,6 +89,7 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 	unsigned int Npart_chunk;
 	unsigned int Nchunks=0, maxNchunks=0;
 	int allParticleRead = 0;
+	int particleRead = 0;
 	
 	FILE *fd;
 	
@@ -141,7 +142,7 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 	printf("Npart_chunk = %d corrsponds to %ld bytes\n", Npart_chunk, Npart_chunk*3*sizeof(float));
 	buf_pos = malloc(Npart_chunk*3*sizeof(float));
 	
-	Nchunks = thisHeader->npart[particle_type]/Npart_chunk;
+	Nchunks = thisHeader->npart[particle_type]/Npart_chunk+1;
 #ifdef __MPI
 	MPI_Allreduce(&Nchunks, &maxNchunks, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 #else
@@ -152,16 +153,17 @@ void read_particle_pos(domain_t * thisDomain, header_t *thisHeader, input_t *thi
 
 	for(unsigned int i=0; i<maxNchunks; i++)
 	{
+		if(allParticleRead == 1) Npart_chunk = 0;
 		if((i+1)*Npart_chunk >= thisHeader->npart[particle_type])
 		{
 			Npart_chunk = thisHeader->npart[particle_type] - i*Npart_chunk;
 			buf_pos = realloc(buf_pos, Npart_chunk*3*sizeof(float));
 			allParticleRead = 1;
 		}
-		if(allParticleRead == 1) Npart_chunk = 0;
-		  
+		particleRead += Npart_chunk;
+
 		/* read data in chunks */
-		printf("reading %d. chunk ... < %d \n", i*Npart_chunk, thisHeader->npart[particle_type]);
+		printf("rank %d: reading %d. chunk ... < %d \n", thisDomain->originRank,particleRead, thisHeader->npart[particle_type]);
 		fread(buf_pos, sizeof(float), Npart_chunk*3, fd);
 
 #ifdef __MPI
@@ -272,48 +274,45 @@ void sort_particles_to_processors(domain_t *thisDomain, header_t *thisHeader, in
 		if(x>=thisDomain->size || y>=thisDomain->size || z>=thisDomain->size) printf("P %d: x=%d\t y=%d\t z=%d\t %f %f %f\n",p,x,y,z,xpos,ypos,zpos);
 		buf_proc[p] = x*dims[1]*dims[2]+y*dims[2]+z;
 		assert(buf_proc[p] == x*dims[1]*dims[2]+y*dims[2]+z);
-// 		if(buf_proc[p] == 0) printf("P %d: %e %e %e\t x=%d\t y=%d\t z=%d\t %d\n",p,xpos, ypos, zpos,x,y,z,thisDomain->originRank);
 		assert(buf_proc[p]<thisDomain->size);
-// 		if(buf_proc[p]==2) printf("P %d: %e %e %e\t x=%d\t y=%d\t z=%d\t %d\t %d %d %d\t %d\t%d\n",p,xpos, ypos, zpos,x,y,z,thisDomain->originRank, dims[0], dims[1], dims[2], x*dims[1]*dims[2]+y*dims[2]+z, buf_proc[p]);
 
 		NpartDomain[buf_proc[p]]++;
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
-// 	printf("rank %d: sending particles to domains... \n",thisDomain->originRank);
 	
 	/* sending particles to each domain from originRank */
 	for(int domain=0; domain<thisDomain->size; domain++)
 	{
+		buf_part_domain = malloc(NpartDomain[domain]*3*sizeof(float));
+		counter = 0;
+		for(int p=0; p<Npart_chunk; p++)
+		{
+			if(buf_proc[p] == domain)
+			{
+				buf_part_domain[counter*3] = buf[p*3];
+				buf_part_domain[counter*3+1] = buf[p*3+1];
+				buf_part_domain[counter*3+2] = buf[p*3+2];
+				counter++;
+			}
+		}
+			
 		if(domain != thisDomain->originRank)
 		{
-// 			printf("rank %d: domain = %d\n", thisDomain->originRank, domain);
-			buf_part_domain = malloc(NpartDomain[domain]*3*sizeof(float));
-			counter = 0;
-			for(int p=0; p<Npart_chunk; p++)
-			{
-				if(buf_proc[p] == domain)
-				{
-					buf_part_domain[counter*3] = buf[p*3];
-					buf_part_domain[counter*3+1] = buf[p*3+1];
-					buf_part_domain[counter*3+2] = buf[p*3+2];
-					counter++;
-				}
-			}
-// 			printf("rank %d: domain %d is sending messages to domain %d\n", thisDomain->originRank, thisDomain->originRank, domain);
 			MPI_Ssend(&NpartDomain[domain], 1, MPI_INT, domain, 100, MPI_COMM_WORLD);
 			MPI_Ssend(buf_part_domain, 3*NpartDomain[domain], MPI_FLOAT, domain, 101, MPI_COMM_WORLD);
-// 			printf("rank %d: here\n", thisDomain->originRank);
-			
-			free(buf_part_domain);
-			/* receving particles from domains to OriginRank */
-			
 		}else{
+			if(strcmp(description, "POS ") == 0) allocateParticles_pos(theseParticles, NpartDomain[domain], buf_part_domain);
+		}
+			
+		free(buf_part_domain);
+		/* receving particles from domains to OriginRank */
+			
+		if(domain == thisDomain->originRank){
 			for(int recDomain=0; recDomain<thisDomain->size; recDomain++)
 			{
 				if(recDomain != thisDomain->originRank)
 				{
-// 					printf("rank %d: receiving domain %d on %d\n", thisDomain->originRank, recDomain, thisDomain->originRank); 
 					MPI_Recv(&recNpartDomain[recDomain],1,MPI_INT,recDomain,100,MPI_COMM_WORLD,&status);
 					rec_buf_part_domain = malloc(recNpartDomain[recDomain]*3*sizeof(float));
 					MPI_Recv(rec_buf_part_domain,3*recNpartDomain[recDomain],MPI_FLOAT,recDomain,101,MPI_COMM_WORLD,&status);

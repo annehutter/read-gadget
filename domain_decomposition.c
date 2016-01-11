@@ -35,7 +35,6 @@ domain_t *initDomain(int thisRank, int size)
 	
 	newDomain->ndims = ndims;
 	
-	printf("%d\t%d\t%d\t%d\t%d\n", size, size%2, size%3, (size%2)%3, (size%3)%2);
 	if(((size%2)%3 != 0) && ((size%3)%2 !=0) && (size != 1))
 	{
 		fprintf(stderr, "ERROR: This number of processors is not allowed for domain decomposition.\n");
@@ -112,7 +111,6 @@ domain_t *initDomain(int thisRank, int size)
 			newDomain->lowlimit[j] = newDomain->coords[j]*tmpDim;
 			newDomain->uplimit[j] = (newDomain->coords[j]+1)*tmpDim;
 		}
-		printf("rank %d: %e %e %e\t %e %e %e\n", newDomain->originRank, newDomain->lowlimit[0], newDomain->lowlimit[1], newDomain->lowlimit[2], newDomain->uplimit[0], newDomain->uplimit[1], newDomain->uplimit[2]);
 #endif
 	}else{
 	  	for(int j=0; j<ndims; j++)
@@ -138,7 +136,7 @@ int getNumNeighbours(int size, int ndims, int *n)
 {
 	int n2 = n[0];
 	int n3 = n[1];
-	int numNeighbours;
+	int numNeighbours = 0;
 	if(size == 1)
 	{
 		numNeighbours = 0;
