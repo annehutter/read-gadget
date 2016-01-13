@@ -30,12 +30,13 @@ float calc_distance(float x1, float y1, float z1, float x2, float y2, float z2)
 	return sqrt(tmp_x*tmp_x+tmp_y*tmp_y+tmp_z*tmp_z);
 }
 
-float get_SPH_density(float distance, char *kernel)
+float get_SPH_density(float r, float h, char *kernel)
 {
 	/* distance is given in units of the smoothing length h */
 	/* result is density in units of h^-3 */
 	
-	float tmp, tmp1, tmp2;
+	float distance = r/h;
+	float tmp, factor;
 	
 	if(strcmp(kernel, "CIC") == 0)
 	{
@@ -49,15 +50,14 @@ float get_SPH_density(float distance, char *kernel)
 	}
 	else if(strcmp(kernel, "SPH") == 0)
 	{
-		if(distance >= 2) tmp = 0.;
+		if(distance > 1.) tmp = 0.;
 		else
 		{
-			tmp1 = 0.25*(2.-distance)*(2.-distance)*(2.-distance);
-			if(distance >= 1) tmp = tmp1*INV_PI;
+			factor = INV_PI*8./(h*h*h);
+			if(distance >= 0.5) tmp = factor*(1.-6.*distance*distance*(1.-distance));
 			else
 			{
-				tmp2 = (1.-distance)*(1.-distance)*(1.-distance);
-				tmp = (tmp1 - tmp2)*INV_PI;
+				tmp = factor*2.*(1.-distance)*(1.-distance)*(1.-distance);
 			}
 		}
 	}else tmp = 0.;
@@ -79,7 +79,8 @@ void compute_SPH_density(domain_t *thisDomain, header_t *thisHeader, part_t *the
 // 	float xp, yp, zp;
 // 	float xp2, yp2, zp2;
 // 	
-// 	float distance = 0.;
+	float distance, dist_sq;
+	float h;
 // 	float density;
 // 	float *rho;
 	
@@ -94,11 +95,11 @@ void compute_SPH_density(domain_t *thisDomain, header_t *thisHeader, part_t *the
 // 	gridcells = malloc(sizeof(int)*theseParticles->num);	
 	
 	void *kd = kd_create(3);
-// 	
-// 	for(int p=0; p<theseParticles->num; p++)
-// 	{
-// 		kd_insertf(kd, &theseParticles->pos[p], 0);
-// 	}
+	
+	for(int p=0; p<theseParticles->num; p++)
+	{
+		kd_insertf(kd, &theseParticles->pos[p], 0);
+	}
 	
 	printf("rank %d: done buliding tree\n", thisDomain->originRank);
 	
@@ -106,12 +107,22 @@ void compute_SPH_density(domain_t *thisDomain, header_t *thisHeader, part_t *the
 	char *pch;
 	float pos[3], dist;
 	float pt[3] = { 0, 0, 1 };
+	
+	MPI_Barrier(MPI_COMM_WORLD);
+	
 	for(int p=0; p<theseParticles->num; p++)
 	{
-// 		res = kd_nearest_rangef(kd, &theseParticles->pos[p], 0.1);//, 40);
-// 		if(p%100000==0) printf("rank %d: p= %d\t res = %d\n",thisDomain->originRank,p,kd_res_size(res));
-		theseParticles->rho[p] = 1.;//kd_res_size(res);
-// 		kd_res_free(res);
+		res = kd_nearest_nf(kd, &theseParticles->pos[p], 40);
+		if(p%100000==0) printf("rank %d: p= %d\t res = %d\n",thisDomain->originRank,p,kd_res_size(res));
+		theseParticles->rho[p] = 0.f;
+		h = 1.;//sqrt(kd_res_item_dist_sq(res, 39));
+		for(int i=0; i<40; i++)
+		{
+			dist_sq = kd_res_item_dist_sq(res, i);
+			distance = sqrt(dist_sq);
+			theseParticles->rho[p] += get_SPH_density(distance, h, "SPH");
+		}
+		kd_res_free(res);
 	}
 // 	printf("found %d results:\n", kd_res_size(res));
 // 	while( !kd_res_end( res ) ) 
