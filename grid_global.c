@@ -259,8 +259,14 @@ void save_inv_rho_to_file(grid_t *thisGrid, input_t *thisInput)
 void save_npart_cell_to_file(grid_t *thisGrid, input_t *thisInput)
 {
 	char filename[200];
+	FILE * f;
 	  
 	sprintf(filename, "%s_npart_cells.dat", thisInput->fname);
+	if((f = fopen(filename,"rb")) != NULL )
+	{
+		fclose(f);
+		remove(filename);
+	}
 	
   	int count = 1;
 	
@@ -293,8 +299,8 @@ void save_npart_cell_to_file(grid_t *thisGrid, input_t *thisInput)
 	
 	offset = 0;
 	
-	MPI_File_set_view(mpifile, offset, MPI_FLOAT, mpi_subarray, "native", MPI_INFO_NULL);
-	MPI_File_write_all(mpifile, thisGrid->npart_cell, count, MPI_FLOAT, &status);
+	MPI_File_set_view(mpifile, offset, MPI_INT, mpi_subarray, "native", MPI_INFO_NULL);
+	MPI_File_write_all(mpifile, thisGrid->npart_cell, count, MPI_INT, &status);
 	MPI_Barrier(MPI_COMM_WORLD);
 	
 #else

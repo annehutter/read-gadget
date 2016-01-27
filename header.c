@@ -148,6 +148,7 @@ void read_header_gadget2(header_t *thisHeader, char *fname, int myRank)
 	
 	fread(thisHeader, sizeof(header_t), 1, fd);
 	printf("%d\t%d\t%d\t%d\t%d\t%d\n", thisHeader->npart[0], thisHeader->npart[1], thisHeader->npart[2], thisHeader->npart[3], thisHeader->npart[4], thisHeader->npart[5]);
+	printf("boxsize = %e\n",thisHeader->BoxSize);
 	fread(&dummy, sizeof(dummy), 1, fd);
 	printf("rank %d: dummy = %d\n",myRank,dummy);
 	fread(&dummy, sizeof(dummy), 1, fd);

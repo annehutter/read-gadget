@@ -50,15 +50,18 @@ float get_SPH_density(float r, float h, char *kernel)
 	}
 	else if(strcmp(kernel, "SPH") == 0)
 	{
-		if(distance > 1.) tmp = 0.;
-		else
+		if(distance > 1.) 
 		{
+			tmp = 0.;
+// 			printf("tmp2 = %e\n",tmp);
+		}else{
 			factor = INV_PI*8./(h*h*h);
 			if(distance >= 0.5) tmp = factor*(1.-6.*distance*distance*(1.-distance));
 			else
 			{
 				tmp = factor*2.*(1.-distance)*(1.-distance)*(1.-distance);
 			}
+// 			printf("tmp = %e\n",tmp);
 		}
 	}else tmp = 0.;
 	
@@ -85,7 +88,7 @@ void compute_SPH_density(domain_t *thisDomain, header_t *thisHeader, part_t *the
 	
 	for(int p=0; p<theseParticles->num; p++)
 	{
-		kd_insertf(kd, &theseParticles->pos[p], 0);
+		kd_insertf(kd, &theseParticles->pos[3*p], 0);
 	}
 	
 	printf("rank %d: done buliding tree\n", thisDomain->originRank);
@@ -99,17 +102,21 @@ void compute_SPH_density(domain_t *thisDomain, header_t *thisHeader, part_t *the
 	
 	for(int p=0; p<theseParticles->num; p++)
 	{
-		res = kd_nearest_nf(kd, &theseParticles->pos[p], 40);
-		if(p%100000==0) printf("rank %d: p= %d\t res = %d\n",thisDomain->originRank,p,kd_res_size(res));
-		theseParticles->rho[p] = 0.f;
-		h = 1.;//sqrt(kd_res_item_dist_sq(res, 39));
+		res = kd_nearest_nf(kd, &theseParticles->pos[3*p], 40);
+		if(p%100000==0 || p<100) printf("rank %d: p= %d\t res = %d\n",thisDomain->originRank,p,kd_res_size(res));
+		theseParticles->rho[p] = 0.;
+// 		printf("size = %i\n", kd_res_size(res));
+		h = 10.;//sqrt(kd_res_item_dist_sq(res, 39));
 		for(int i=0; i<40; i++)
 		{
 			dist_sq = kd_res_item_dist_sq(res, i);
 			distance = sqrt(dist_sq);
+// 			printf("%i: %e\t %e\t%e\n", i, distance, h,theseParticles->rho[p]);
 			theseParticles->rho[p] += get_SPH_density(distance, h, "SPH");
 		}
 		kd_res_free(res);
+		if(theseParticles->rho[p]<=0.) printf("rank %d: p= %d\t rho = %e\n",thisDomain->originRank,p,theseParticles->rho[p]);
+		if(p%100000==0 || p<100) printf("rank %d: p= %d\t rho = %e\t %e\t%e\t%e\n",thisDomain->originRank,p,theseParticles->rho[p], theseParticles->pos[3*p], theseParticles->pos[3*p+1], theseParticles->pos[3*p+2]);
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);

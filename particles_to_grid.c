@@ -80,14 +80,15 @@ void comp_arrays_for_clump(domain_t *thisDomain, part_t *theseParticles, grid_t 
 		
 		rho = theseParticles->rho[p];
 		
+		if(p<100) printf("rank %d: p = %d\trho = %e\n",thisDomain->originRank,p,rho);
 		if(index >=0 && index < totNcells)
 		{
-			if(rho>0. && rho<upLimit*meanRhoPart)
-			{
+// 			if(rho>0. && rho<upLimit*meanRhoPart)
+// 			{
 				thisGrid->rho[index] += rho;
 				thisGrid->inv_rho[index] += 1./rho;
 				thisGrid->npart_cell[index] += 1;
-			}
+// 			}
 		}else{
 			printf("rank %d: particle %d has an incorrect index %d: %d %d %d\n", thisDomain->originRank, p, index, x_int, y_int, z_int);
 		}
@@ -111,7 +112,7 @@ void produce_clumping_factor_fields(domain_t *thisDomain, header_t *thisHeader, 
 	
 	printf("rank %d: numParticles = %d\n",thisDomain->originRank, theseParticles->num);
 	save_rho_to_file(thisGrid, thisInput);
-	save_inv_rho_to_file(thisGrid, thisInput);
+// 	save_inv_rho_to_file(thisGrid, thisInput);
 	save_npart_cell_to_file(thisGrid, thisInput);
 	
 	deallocateGrid(thisGrid);
